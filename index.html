@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>محاكي المريض الافتراضي — المؤسسة العربية للصحة النفسية والتدريب</title>
+<style>
+  :root{
+    --bg:#F3F5F8; --ink:#101820; --sub:#5B6673; --line:#DCE3EC;
+    --accent:#0060C4; --accent-dark:#003BB9; --white:#fff; --danger:#B5432E;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0; font-family:'Segoe UI', Tahoma, sans-serif; background:var(--bg); color:var(--ink);}
+  header{background:linear-gradient(90deg,#003BB9,#0060C4,#049FD9); color:#fff; padding:22px 24px;}
+  header h1{margin:0; font-size:20px;}
+  header p{margin:6px 0 0; font-size:13.5px; color:#E4F1FB;}
+  .wrap{max-width:820px; margin:0 auto; padding:24px;}
+  .card{background:var(--white); border:1px solid var(--line); border-radius:8px; padding:20px; margin-bottom:18px;}
+  label{display:block; font-size:13.5px; color:var(--sub); margin-bottom:6px;}
+  select, textarea{
+    width:100%; padding:10px 12px; border:1px solid var(--line); border-radius:6px;
+    font-family:inherit; font-size:14.5px; margin-bottom:14px; background:#fff;
+  }
+  textarea{min-height:90px; resize:vertical;}
+  button{
+    background:var(--accent); color:#fff; border:none; padding:11px 22px;
+    border-radius:6px; font-size:14.5px; font-weight:600; cursor:pointer;
+  }
+  button:hover{background:var(--accent-dark);}
+  button.secondary{background:#fff; color:var(--accent); border:1px solid var(--accent);}
+  button:disabled{opacity:0.5; cursor:not-allowed;}
+  #chatArea{display:none;}
+  #messages{
+    max-height:420px; overflow-y:auto; padding:6px 4px; margin-bottom:14px;
+    display:flex; flex-direction:column; gap:10px;
+  }
+  .msg{max-width:78%; padding:10px 14px; border-radius:12px; font-size:14.5px; line-height:1.6;}
+  .msg.patient{background:#EEF2F7; align-self:flex-start; border-bottom-left-radius:2px;}
+  .msg.trainee{background:var(--accent); color:#fff; align-self:flex-end; border-bottom-right-radius:2px;}
+  .inputRow{display:flex; gap:10px;}
+  .inputRow input{flex:1; padding:11px 14px; border:1px solid var(--line); border-radius:6px; font-size:14.5px;}
+  .actions{display:flex; gap:10px; margin-top:14px;}
+  #report{display:none; white-space:pre-wrap; line-height:1.9; font-size:14.5px;}
+  .loading{color:var(--sub); font-size:13.5px;}
+  .err{color:var(--danger); font-size:13.5px; margin-top:8px;}
+</style>
+</head>
+<body>
+
+<header>
+  <h1>محاكي المريض الافتراضي</h1>
+  <p>المؤسسة العربية للصحة النفسية والتدريب — أداة تدريب عملي للأخصائيين النفسيين</p>
+</header>
+
+<div class="wrap">
+
+  <div class="card" id="setupCard">
+    <label>اختر حالة</label>
+    <select id="caseSelect">
+      <option value="depression">حالة اكتئاب (سارة، 29 سنة)</option>
+      <option value="anxiety">حالة قلق (كريم، 24 سنة)</option>
+      <option value="custom">حالة مخصصة (اكتبها بنفسك)</option>
+    </select>
+
+    <div id="customCaseWrap" style="display:none;">
+      <label>وصف الحالة (اسم، سن، الأعراض، الخلفية)</label>
+      <textarea id="customCase" placeholder="مثال: أحمد، 35 سنة، بييجي بشكوى من قلق مستمر من 6 شهور..."></textarea>
+    </div>
+
+    <button id="startBtn">ابدأ الجلسة</button>
+    <div class="err" id="setupErr"></div>
+  </div>
+
+  <div class="card" id="chatArea">
+    <div id="messages"></div>
+    <div class="inputRow">
+      <input type="text" id="userInput" placeholder="اكتب سؤالك للمريض...">
+      <button id="sendBtn">إرسال</button>
+    </div>
+    <div class="actions">
+      <button class="secondary" id="endBtn">إنهاء الجلسة واعرض التقرير</button>
+      <button class="secondary" id="resetBtn">جلسة جديدة</button>
+    </div>
+    <div class="loading" id="loadingMsg" style="display:none;">المريض بيرد...</div>
+  </div>
+
+  <div class="card" id="reportCard" style="display:none;">
+    <h3 style="margin-top:0;">تقرير الجلسة</h3>
+    <div id="report"></div>
+  </div>
+
+</div>
+
+<script>
+const CASES = {
+  depression: {
+    label: "حالة اكتئاب (سارة، 29 سنة)",
+    persona: `إنت بتلعب دور "سارة"، مريضة عندها 29 سنة، جاية لجلسة تقييم نفسي أول مرة. بتعاني من حزن مستمر ونقص طاقة من حوالي 3 شهور، بعد ما اتخنقت في الشغل. عندها مشاكل نوم (بتصحى بدري)، فقدت شهيتها شوية، مش بتستمتع بحاجة كانت بتحبها، وحاسة إنها فاشلة. متجوزة وعندها ابن صغير. مش بتفكر تأذي نفسها لكن أحيانًا بتفكر "يريحني أنام ومصحاش"، وده بيظهر بس لو اتسألت بشكل مباشر وواضح عن التفكير في الموت أو الانتحار. متكلميش عن أي حاجة من دول من نفسك، لازم تتسأل عنها بشكل واضح.`,
+    checklist: ["مدة الأعراض وبدايتها", "وصف المزاج بالتفصيل", "النوم", "الشهية والوزن", "الطاقة والتركيز", "فقدان الاستمتاع بالأشياء (Anhedonia)", "الشعور بالذنب أو انعدام القيمة", "تقييم الأفكار الانتحارية بشكل مباشر وصريح", "تأثير الأعراض على الحياة اليومية والعمل", "الدعم الاجتماعي المتاح", "نوبات سابقة أو علاج نفسي قديم", "الضغوط الحالية (زي ضغط الشغل)"]
+  },
+  anxiety: {
+    label: "حالة قلق (كريم، 24 سنة)",
+    persona: `إنت بتلعب دور "كريم"، شاب عنده 24 سنة، جاي لجلسة تقييم بسبب قلق شديد ونوبات هلع من حوالي 4 شهور، بدأت بعد حادثة مرورية بسيطة. بيحس بخفقان قلب وضيق نفس وخوف من الموت وقت النوبة. بدأ يتجنب القيادة والأماكن المزدحمة. مش عارف يركز في شغله. قلقان إن حد يحكم عليه إنه "ضعيف". معندوش أفكار إيذاء نفس خالص. متكلمش عن تفاصيل الحادثة أو نمط التجنب من نفسك، لازم تتسأل عنهم.`,
+    checklist: ["بداية الأعراض وعلاقتها بالحادثة", "وصف نوبة الهلع بالتفصيل", "الأعراض الجسدية أثناء النوبة", "تكرار النوبات ومدتها", "سلوك التجنب (القيادة، الأماكن المزدحمة)", "تأثير القلق على العمل والحياة اليومية", "أفكار إيذاء النفس أو الانتحار (للتأكد من غيابها)", "استخدام أي مواد للتهدئة (كحول، مهدئات)", "الدعم الاجتماعي", "علاج نفسي أو دوائي سابق", "المخاوف من وصمة العار الاجتماعية"]
+  }
+};
+
+let history = [];
+let currentCase = null;
+const $ = id => document.getElementById(id);
+
+$("caseSelect").addEventListener("change", () => {
+  $("customCaseWrap").style.display = $("caseSelect").value === "custom" ? "block" : "none";
+});
+
+async function callAI(systemInstruction, contents) {
+  const res = await fetch("/.netlify/functions/gemini-proxy", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ systemInstruction, contents })
+  });
+  if (!res.ok) {
+    const t = await res.text();
+    throw new Error("فشل الاتصال: " + res.status + " — " + t.slice(0, 200));
+  }
+  const data = await res.json();
+  return data.candidates?.[0]?.content?.parts?.[0]?.text || "(مفيش رد)";
+}
+
+function addMsg(text, who) {
+  const el = document.createElement("div");
+  el.className = "msg " + who;
+  el.textContent = text;
+  $("messages").appendChild(el);
+  $("messages").scrollTop = $("messages").scrollHeight;
+}
+
+$("startBtn").addEventListener("click", () => {
+  const sel = $("caseSelect").value;
+  if (sel === "custom") {
+    const desc = $("customCase").value.trim();
+    if (!desc) { $("setupErr").textContent = "اكتب وصف الحالة الأول."; return; }
+    currentCase = {
+      label: "حالة مخصصة",
+      persona: `إنت بتلعب دور مريض بالمواصفات دي: ${desc}. متكلمش عن تفاصيل زيادة عن اللي مكتوب من نفسك، لازم الأخصائي يتسأل عنها. لو حد سأل عن أفكار إيذاء النفس بشكل مباشر، رد بصدق حسب طبيعة الحالة.`,
+      checklist: null
+    };
+  } else {
+    currentCase = CASES[sel];
+  }
+  $("setupCard").style.display = "none";
+  $("chatArea").style.display = "block";
+  history = [];
+  addMsg(`(بدأت الجلسة — ${currentCase.label})`, "patient");
+});
+
+$("sendBtn").addEventListener("click", sendMessage);
+$("userInput").addEventListener("keydown", e => { if (e.key === "Enter") sendMessage(); });
+
+async function sendMessage() {
+  const text = $("userInput").value.trim();
+  if (!text) return;
+  addMsg(text, "trainee");
+  history.push({ role: "user", parts: [{ text }] });
+  $("userInput").value = "";
+  $("loadingMsg").style.display = "block";
+  $("sendBtn").disabled = true;
+  try {
+    const reply = await callAI(currentCase.persona, history);
+    history.push({ role: "model", parts: [{ text: reply }] });
+    addMsg(reply, "patient");
+  } catch (e) {
+    addMsg("⚠️ " + e.message, "patient");
+  }
+  $("loadingMsg").style.display = "none";
+  $("sendBtn").disabled = false;
+}
+
+$("endBtn").addEventListener("click", async () => {
+  const transcript = history.map(h => (h.role === "user" ? "الأخصائي: " : "المريض: ") + h.parts[0].text).join("\n");
+  const checklistText = currentCase.checklist
+    ? "قائمة النقاط الأساسية المفترض تغطيتها:\n- " + currentCase.checklist.join("\n- ")
+    : "استنتج بنفسك أهم النقاط الإكلينيكية المفترض تغطيتها لحالة زي دي.";
+  const supervisorPrompt = `إنت مشرف تدريب إكلينيكي. هتراجع نص محادثة بين متدرب (أخصائي نفسي) و"مريض" افتراضي.
+${checklistText}
+
+اكتب تقرير باللهجة المصرية يشمل:
+1. النقاط اللي المتدرب غطاها كويس (بنقاط مختصرة)
+2. النقاط المهمة اللي فاتته أو محتاجة توضيح أكتر
+3. تنبيه خاص لو فيه سؤال حرج (زي تقييم الخطورة أو الأفكار الانتحارية) اتسأل بشكل ناقص أو معملوش خالص
+4. ملاحظة عامة على أسلوب الأسئلة (مباشر/غير مباشر، مفتوح/مغلق)
+
+نص المحادثة:
+${transcript}`;
+
+  $("report").textContent = "بيجهز التقرير...";
+  $("reportCard").style.display = "block";
+  $("endBtn").disabled = true;
+  try {
+    const result = await callAI("إنت مشرف تدريب إكلينيكي دقيق وموضوعي.", [{ role: "user", parts: [{ text: supervisorPrompt }] }]);
+    $("report").textContent = result;
+  } catch (e) {
+    $("report").textContent = "⚠️ " + e.message;
+  }
+  $("endBtn").disabled = false;
+});
+
+$("resetBtn").addEventListener("click", () => location.reload());
+</script>
+
+</body>
+</html>
