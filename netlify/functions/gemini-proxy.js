@@ -6,7 +6,6 @@
 const MODELS_TO_TRY = [
   "gemini-3.8-flash",
   "gemini-flash-latest",
-  "gemini-2.5-flash",
 ];
 
 const MAX_RETRIES_PER_MODEL = 2;   // عدد المحاولات لكل موديل قبل ما ينتقل للي بعده
